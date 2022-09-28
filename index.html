@@ -19,6 +19,7 @@
             stopped = true
         }
         async function startVideoCapture() {
+            const start = Date.now()
             const output = document.querySelector('#output')
             const statusDiv = createDiv()
             statusDiv.append('Processing')
@@ -55,9 +56,14 @@
             stopped = false
             const FPS = 25// this comes as an input
             const totalExpectedFrames = Math.floor(FPS * video.duration) // this comes as an input
+
+
             const intervalPerFrame = 1 / FPS; // 0.1 sec
             let currentTime = intervalPerFrame;
             let i = 0;
+            output.removeChild(statusDiv)
+            statusDiv.innerHTML = `Capturing ${i} of ${totalExpectedFrames} frames`
+            output.append(statusDiv)
             video.currentTime = 0.01;
             await new Promise(r => seekComplete = r);
             frameReader.read().then(async function processFrame({ done, value }) {
@@ -80,19 +86,32 @@
                         img.src = frame.url;
                         img.width = video.width;
                         img.height = video.height;
-                        img.style.padding="5px 5px 5px 5px"
+                        img.style.padding = "5px 5px 5px 5px"
                         img.style.objectFit = 'contain'
                         img.style.borderRadius = '10px'
                         output.append(img)
                     })
+                    const end = new Date().getTime()
+                    var timeDiff = end - start; //in ms
+                    // strip the ms
+                    timeDiff /= 1000;
+
+                    // get seconds 
+                    var seconds = Math.round(timeDiff);
+                    statusDiv.innerHTML = `Completed ${i} of ${totalExpectedFrames} frames. Elapsed time ${seconds} secs`
+                    output.append(statusDiv)
+
                     return;
                 }
 
                 var img = await createImageBitmap(value);
                 ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                 i++
+                statusDiv.innerHTML = `Capturing ${i} of ${totalExpectedFrames} frames`
+                output.append(statusDiv)
                 canvas.toBlob(async (blob) => {
                     const url = URL.createObjectURL(blob)
+
                     imageFrames.push({
                         id: i,
                         img,
@@ -122,9 +141,20 @@
                             img.height = video.height;
                             img.style.objectFit = 'contain'
                             img.style.borderRadius = '10px'
-                            img.style.padding="5px 5px 5px 5px"
+                            img.style.padding = "5px 5px 5px 5px"
                             output.append(img)
                         })
+
+                        const end = new Date().getTime()
+                        var timeDiff = end - start; //in ms
+                        // strip the ms
+                        timeDiff /= 1000;
+
+                        // get seconds 
+                        var seconds = Math.round(timeDiff);
+                        statusDiv.innerHTML = `Completed ${i} of ${totalExpectedFrames} frames. Elapsed time ${seconds} secs`
+                        output.append(statusDiv)
+
                         return
                     }
 
@@ -141,13 +171,14 @@
 <body>
     <h1>Capture video frames with web codecs</h1>
     <video id="video" width="320" height="160" controls>
-        <source src="https://media.vimejs.com/720p.mp4" type="video/mp4">
-        <source src="https://media.vimejs.com/720p.ogg" type="video/ogg">
+        <source src="mov_bbb.mp4" type="video/mp4">
         Your browser does not support HTML5 video.
     </video>
-
-    <button onclick="startVideoCapture()" type="button" id="btn">Start capture frames</button>
-    <button onclick="stopVideoCapture()" type="button" id="btn-stop">Stop capture frames</button>
+    <div>
+        <button onclick="startVideoCapture()" type="button" id="btn">Start capture frames</button>
+        <button onclick="stopVideoCapture()" type="button" id="btn-stop">Stop capture frames</button>
+        <p>Follow console logs for status</p>
+    </div>
 
 
     <div id="output">
