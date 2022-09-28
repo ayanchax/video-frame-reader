@@ -1,0 +1,71 @@
+<html>
+
+<head>
+    <title>Video Frame Capture</title>
+    <script>
+         // Change this value from a "Stop button";
+         var stopped = false;
+         function stopVideoCapture(){
+            stopped=true
+         }
+         function startVideoCapture() {
+            var canvas = document.querySelector("canvas");
+            var ctx = canvas.getContext('2d');
+
+            var video = document.querySelector("video");
+             
+
+            var track = video.captureStream().getVideoTracks()[0];
+             
+            var processor = new MediaStreamTrackProcessor(track);
+
+            const frameReader = processor.readable.getReader();
+
+            stopped=false
+            
+            frameReader.read().then(async function processFrame({ done, value }) {
+                console.log(value)
+                if (done) {
+                    console.log("Stream is done");
+                    return;
+                }
+
+                if (stopped) {
+                    frameReader.releaseLock();
+                    processor.readable.cancel();
+                    value.close();
+                    console.log("Stopped");
+                    return;
+                }
+
+                var img = await createImageBitmap(value);
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                canvas.toBlob((blob)=>{
+                    const url = URL.createObjectURL(blob)
+                    console.log(url)
+                    img.close();
+                    value.close();
+                })
+                frameReader.read().then(processFrame);
+            })
+        }
+
+    </script>
+</head>
+
+<body>
+    <h1>Capture video frames with web codecs</h1>
+    <video id="video" width="320" height="160" controls>
+        <source src="mov_bbb.mp4" type="video/mp4">
+        <source src="mov_bbb.ogg" type="video/ogg">
+        Your browser does not support HTML5 video.
+    </video>
+
+    <button onclick="startVideoCapture()" type="button" id="btn">Start capture frames</button>
+    
+    <button onclick="stopVideoCapture()" type="button" id="btn">Stop capture</button>
+    
+    <canvas width="320" height="160"></canvas>
+</body>
+
+</html>
