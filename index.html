@@ -5,6 +5,7 @@
     <script>
         // Change this value from a "Stop button";
         var stopped = false;
+        var started = false;
         var imageFrames = []
         function createVideo() {
             return document.createElement('video')
@@ -19,8 +20,13 @@
             stopped = true
         }
         async function startVideoCapture() {
+            if(started){
+                return;
+            }
+            started=true
             const start = Date.now()
             const output = document.querySelector('#output')
+            output.innerHTML =''
             const statusDiv = createDiv()
             statusDiv.append('Processing')
             output.append(statusDiv)
@@ -44,8 +50,8 @@
             }
 
             video.crossOrigin = "Anonymous";
-            video.height = 160;
-            video.width = 320;
+            video.height = 160; // this will be coming from configuration as an input
+            video.width = 320; // this will be coming from configuration as an input
             const canvas = createCanvas();
             canvas.width = video.width;
             canvas.height = video.height;
@@ -54,8 +60,8 @@
             var processor = new MediaStreamTrackProcessor(track);
             const frameReader = processor.readable.getReader();
             stopped = false
-            const FPS = 25// this comes as an input
-            const totalExpectedFrames = Math.floor(FPS * video.duration) // this comes as an input
+            const FPS = 25// this will be coming from configuration as an input
+            const totalExpectedFrames = Math.floor(FPS * video.duration) // this will be coming from configuration as an input
 
 
             const intervalPerFrame = 1 / FPS; // 0.1 sec
@@ -100,7 +106,7 @@
                     var seconds = Math.round(timeDiff);
                     statusDiv.innerHTML = `Completed ${i} of ${totalExpectedFrames} frames. Elapsed time ${seconds} secs`
                     output.append(statusDiv)
-
+                    started=false
                     return;
                 }
 
@@ -154,7 +160,7 @@
                         var seconds = Math.round(timeDiff);
                         statusDiv.innerHTML = `Completed ${i} of ${totalExpectedFrames} frames. Elapsed time ${seconds} secs`
                         output.append(statusDiv)
-
+                        started=false
                         return
                     }
 
@@ -177,7 +183,9 @@
     <div>
         <button onclick="startVideoCapture()" type="button" id="btn">Start capture frames</button>
         <button onclick="stopVideoCapture()" type="button" id="btn-stop">Stop capture frames</button>
-        <p>Follow console logs for status</p>
+        <p>Follow console logs for status, once capture is done, the frames will be visible below..</p>
+       
+        <small>You don't have to necessarily play the video to start capturing 😉, just click on Start button to begin capturing the video frames 🚀</small>
     </div>
 
 
