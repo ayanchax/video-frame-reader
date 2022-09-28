@@ -3,50 +3,135 @@
 <head>
     <title>Video Frame Capture</title>
     <script>
-         // Change this value from a "Stop button";
-         var stopped = false;
-         function stopVideoCapture(){
-            stopped=true
-         }
-         function startVideoCapture() {
-            var canvas = document.querySelector("canvas");
+        // Change this value from a "Stop button";
+        var stopped = false;
+        var imageFrames = []
+        function createVideo() {
+            return document.createElement('video')
+        }
+        function createDiv() {
+            return document.createElement('div')
+        }
+        function createCanvas() {
+            return document.createElement('canvas')
+        }
+        function stopVideoCapture() {
+            stopped = true
+        }
+        async function startVideoCapture() {
+            const output = document.querySelector('#output')
+            const statusDiv = createDiv()
+            statusDiv.append('Processing')
+            output.append(statusDiv)
+            const video = createVideo()
+            video.src = 'mov_bbb.mp4' //pass this as input
+            let seekComplete;
+            video.onseeked = async (event) => {
+                if (seekComplete) seekComplete();
+                /**
+                 * The seeked event is fired when a seek operation completed,
+                 * the current playback position has changed,
+                 * and the Boolean seeking attribute is changed to false.
+                 */
+            };
+            // workaround chromium metadata bug (https://stackoverflow.com/q/38062864/993683)
+            while (
+                (video.duration === Infinity || isNaN(video.duration)) &&
+                video.readyState < 2
+            ) {
+                await new Promise((r) => setTimeout(r, 1000));
+            }
+
+            video.crossOrigin = "Anonymous";
+            video.height = 160;
+            video.width = 320;
+            const canvas = createCanvas();
+            canvas.width = video.width;
+            canvas.height = video.height;
             var ctx = canvas.getContext('2d');
-
-            var video = document.querySelector("video");
-             
-
             var track = video.captureStream().getVideoTracks()[0];
-             
             var processor = new MediaStreamTrackProcessor(track);
-
             const frameReader = processor.readable.getReader();
-
-            stopped=false
-            
+            stopped = false
+            const FPS = 25// this comes as an input
+            const totalExpectedFrames = Math.floor(FPS * video.duration) // this comes as an input
+            const intervalPerFrame = 1 / FPS; // 0.1 sec
+            let currentTime = intervalPerFrame;
+            let i = 0;
+            video.currentTime = 0.01;
+            await new Promise(r => seekComplete = r);
             frameReader.read().then(async function processFrame({ done, value }) {
-                console.log(value)
+
                 if (done) {
                     console.log("Stream is done");
                     return;
                 }
 
-                if (stopped) {
+                if (stopped) { // brute force stop handler
                     frameReader.releaseLock();
                     processor.readable.cancel();
                     value.close();
                     console.log("Stopped");
+                    video.remove();
+                    console.log(imageFrames)
+                    output.removeChild(statusDiv)
+                    imageFrames.map((frame) => {
+                        const img = new Image();
+                        img.src = frame.url;
+                        img.width = video.width;
+                        img.height = video.height;
+                        img.style.padding="5px 5px 5px 5px"
+                        img.style.objectFit = 'contain'
+                        img.style.borderRadius = '10px'
+                        output.append(img)
+                    })
                     return;
                 }
 
                 var img = await createImageBitmap(value);
                 ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                canvas.toBlob((blob)=>{
+                i++
+                canvas.toBlob(async (blob) => {
                     const url = URL.createObjectURL(blob)
-                    console.log(url)
+                    imageFrames.push({
+                        id: i,
+                        img,
+                        url,
+                        t: currentTime
+                    })
+                    currentTime += intervalPerFrame;
+                    console.log(`frame#${i}`, url)
                     img.close();
                     value.close();
+                    if (i == totalExpectedFrames) {
+                        // streaming of video completes
+                        console.log("stream done");
+                        stopped = true;
+                        done = true;
+                        frameReader.releaseLock();
+                        processor.readable.cancel();
+                        value.close();
+                        console.log("Stopped");
+                        video.remove();
+                        console.log(imageFrames)
+                        output.removeChild(statusDiv)
+                        imageFrames.map((frame) => {
+                            const img = new Image();
+                            img.src = frame.url;
+                            img.width = video.width;
+                            img.height = video.height;
+                            img.style.objectFit = 'contain'
+                            img.style.borderRadius = '10px'
+                            img.style.padding="5px 5px 5px 5px"
+                            output.append(img)
+                        })
+                        return
+                    }
+
+                    video.currentTime = currentTime;
+                    await new Promise(r => seekComplete = r);
+                    frameReader.read().then(processFrame);
                 })
-                frameReader.read().then(processFrame);
             })
         }
 
@@ -56,16 +141,18 @@
 <body>
     <h1>Capture video frames with web codecs</h1>
     <video id="video" width="320" height="160" controls>
-        <source src="mov_bbb.mp4" type="video/mp4">
-        <source src="mov_bbb.ogg" type="video/ogg">
+        <source src="https://media.vimejs.com/720p.mp4" type="video/mp4">
+        <source src="https://media.vimejs.com/720p.ogg" type="video/ogg">
         Your browser does not support HTML5 video.
     </video>
 
     <button onclick="startVideoCapture()" type="button" id="btn">Start capture frames</button>
-    
-    <button onclick="stopVideoCapture()" type="button" id="btn">Stop capture</button>
-    
-    <canvas width="320" height="160"></canvas>
+    <button onclick="stopVideoCapture()" type="button" id="btn-stop">Stop capture frames</button>
+
+
+    <div id="output">
+
+    </div>
 </body>
 
 </html>
